@@ -1,1 +1,252 @@
+name: Build HEFJA APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Create HEFJA Android project
+        run: |
+          flutter create hefja --platforms=android --org ch.hefja --project-name hefja
+          cat > hefja/lib/main.dart <<'DART'
+          import 'dart:math' as math;
+          import 'package:flutter/material.dart';
+          import 'package:flutter/services.dart';
+
+          void main() {
+            WidgetsFlutterBinding.ensureInitialized();
+            SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              systemNavigationBarColor: Color(0xFF050505),
+              statusBarIconBrightness: Brightness.light,
+              systemNavigationBarIconBrightness: Brightness.light,
+            ));
+            runApp(const HefjaApp());
+          }
+
+          class C {
+            static const bg = Color(0xFF030303);
+            static const steel = Color(0xFFE0E0E0);
+            static const muted = Color(0xFF777777);
+            static const ember = Color(0xFFE43A26);
+            static const red = Color(0xFFB82019);
+          }
+
+          class HefjaApp extends StatelessWidget {
+            const HefjaApp({super.key});
+            @override
+            Widget build(BuildContext context) => MaterialApp(
+              debugShowCheckedModeBanner: false,
+              title: 'HEFJA',
+              theme: ThemeData.dark(useMaterial3: true).copyWith(scaffoldBackgroundColor: C.bg),
+              home: const Shell(),
+            );
+          }
+
+          class Shell extends StatefulWidget {
+            const Shell({super.key});
+            @override
+            State<Shell> createState() => _ShellState();
+          }
+
+          class _ShellState extends State<Shell> {
+            int index = 0;
+            final names = const ['HOME', 'CALENDARIO', 'PROGRAMMI', 'STRUMENTI', 'WOD'];
+            final icons = const [Icons.home_rounded, Icons.calendar_month_rounded, Icons.assignment_rounded, Icons.handyman_rounded, Icons.fitness_center_rounded];
+            @override
+            Widget build(BuildContext context) => Scaffold(
+              body: index == 0 ? const Home() : PlaceholderPage(title: names[index], icon: icons[index]),
+              bottomNavigationBar: SafeArea(
+                top: false,
+                child: Container(
+                  height: 70,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF171717), Color(0xFF050505)]),
+                    border: Border(top: BorderSide(color: Color(0xFF4A4A4A), width: .8)),
+                  ),
+                  child: Row(children: List.generate(names.length, (i) {
+                    final active = i == index;
+                    return Expanded(child: InkWell(
+                      onTap: () { HapticFeedback.selectionClick(); setState(() => index = i); },
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(icons[i], size: 26, color: active ? C.steel : C.muted, shadows: active ? const [Shadow(color: C.ember, blurRadius: 8)] : null),
+                        const SizedBox(height: 3),
+                        FittedBox(child: Text(names[i], style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: .5, color: active ? C.ember : C.muted))),
+                        const SizedBox(height: 4),
+                        AnimatedContainer(duration: const Duration(milliseconds: 160), width: active ? 32 : 0, height: 2, color: C.ember),
+                      ]),
+                    ));
+                  })),
+                ),
+              ),
+            );
+          }
+
+          class Home extends StatelessWidget {
+            const Home({super.key});
+            @override
+            Widget build(BuildContext context) => ForgeBg(child: SafeArea(bottom: false, child: LayoutBuilder(builder: (context, c) {
+              final landscape = c.maxWidth > c.maxHeight && c.maxWidth > 650;
+              if (landscape) {
+                return SingleChildScrollView(padding: const EdgeInsets.all(16), child: Row(children: [
+                  const Expanded(flex: 34, child: Brand(compact: true)),
+                  const SizedBox(width: 18),
+                  Expanded(flex: 66, child: Column(children: [
+                    ActionCard(main: true, height: 150, title: 'ALLENAMENTO\nDEL GIORNO', subtitle: 'Crea o continua il workout', icon: Icons.fitness_center_rounded, onTap: () => open(context, 'ALLENAMENTO DEL GIORNO', Icons.fitness_center_rounded)),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(child: ActionCard(height: 130, title: 'PROGRESSI', subtitle: 'Statistiche e andamento', icon: Icons.trending_up_rounded, onTap: () => open(context, 'PROGRESSI', Icons.trending_up_rounded))),
+                      const SizedBox(width: 10),
+                      Expanded(child: ActionCard(height: 130, title: 'DATI ATLETA', subtitle: 'Profilo, misure e PR', icon: Icons.person_rounded, onTap: () => open(context, 'DATI ATLETA', Icons.person_rounded))),
+                    ]),
+                  ])),
+                ]));
+              }
+              return SingleChildScrollView(padding: const EdgeInsets.fromLTRB(14, 8, 14, 18), child: Column(children: [
+                const Brand(),
+                const SizedBox(height: 18),
+                ActionCard(main: true, height: 170, title: 'ALLENAMENTO\nDEL GIORNO', subtitle: 'Crea o continua il workout', icon: Icons.fitness_center_rounded, onTap: () => open(context, 'ALLENAMENTO DEL GIORNO', Icons.fitness_center_rounded)),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(child: ActionCard(height: 148, title: 'PROGRESSI', subtitle: 'Statistiche e andamento', icon: Icons.trending_up_rounded, onTap: () => open(context, 'PROGRESSI', Icons.trending_up_rounded))),
+                  const SizedBox(width: 12),
+                  Expanded(child: ActionCard(height: 148, title: 'DATI ATLETA', subtitle: 'Profilo, misure e PR', icon: Icons.person_rounded, onTap: () => open(context, 'DATI ATLETA', Icons.person_rounded))),
+                ]),
+              ]));
+            })));
+            static void open(BuildContext context, String title, IconData icon) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PlaceholderPage(title: title, icon: icon)));
+          }
+
+          class ForgeBg extends StatelessWidget {
+            const ForgeBg({super.key, required this.child});
+            final Widget child;
+            @override
+            Widget build(BuildContext context) => DecoratedBox(
+              decoration: const BoxDecoration(gradient: RadialGradient(center: Alignment.topCenter, radius: 1.25, colors: [Color(0xFF181818), Color(0xFF080808), C.bg], stops: [0, .44, 1])),
+              child: Stack(fit: StackFit.expand, children: [const CustomPaint(painter: Cracks()), child]),
+            );
+          }
+
+          class Cracks extends CustomPainter {
+            const Cracks();
+            @override
+            void paint(Canvas canvas, Size s) {
+              final p = Paint()..style = PaintingStyle.stroke..strokeWidth = .7..color = C.ember.withOpacity(.09);
+              final q = Path()..moveTo(s.width*.79,s.height*.66)..lineTo(s.width*.91,s.height*.61)..lineTo(s.width*.96,s.height*.80);
+              final r = Path()..moveTo(s.width*.03,s.height*.20)..lineTo(s.width*.13,s.height*.16)..lineTo(s.width*.20,s.height*.29);
+              canvas.drawPath(q,p); canvas.drawPath(r,p);
+            }
+            @override bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+          }
+
+          class Brand extends StatelessWidget {
+            const Brand({super.key, this.compact = false});
+            final bool compact;
+            @override
+            Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, children: [
+              SizedBox(width: compact ? 145 : 185, height: compact ? 145 : 185, child: const CustomPaint(painter: Mark())),
+              Text('HEFJA', style: TextStyle(fontSize: compact ? 35 : 46, height: .95, fontWeight: FontWeight.w900, letterSpacing: 3, color: C.steel, shadows: const [Shadow(color: Colors.black, blurRadius: 4, offset: Offset(0,2)), Shadow(color: Color(0x66E43A26), blurRadius: 4)])),
+              const SizedBox(height: 4),
+              Text('TRAINING SYSTEM', style: TextStyle(fontSize: compact ? 10 : 12, fontWeight: FontWeight.w900, letterSpacing: compact ? 2.5 : 4, color: C.steel)),
+              const SizedBox(height: 6),
+              Text('GROW.  ADAPT.  OVERCOME.', style: TextStyle(fontSize: compact ? 8 : 10, fontWeight: FontWeight.w900, letterSpacing: 2, color: C.ember)),
+            ]);
+          }
+
+          class Mark extends CustomPainter {
+            const Mark();
+            @override
+            void paint(Canvas canvas, Size s) {
+              final center = Offset(s.width/2, s.height/2);
+              final ring = Paint()..style=PaintingStyle.stroke..strokeWidth=s.width*.035..strokeCap=StrokeCap.round..color=C.red.withOpacity(.9);
+              canvas.drawArc(Rect.fromCircle(center:center,radius:s.width*.40), -.45, math.pi*1.72, false, ring);
+              final metal = Paint()..shader=const LinearGradient(begin:Alignment.topLeft,end:Alignment.bottomRight,colors:[Color(0xFFB5B5B5),Color(0xFF444444),Color(0xFF101010)]).createShader(Offset.zero & s);
+              final glow = Paint()..style=PaintingStyle.stroke..strokeWidth=s.width*.012..color=C.ember.withOpacity(.75);
+              final h = RRect.fromRectAndRadius(Rect.fromLTWH(s.width*.28,s.height*.12,s.width*.44,s.height*.34),Radius.circular(s.width*.16));
+              canvas.drawRRect(h,metal); canvas.drawRRect(h,glow);
+              canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(s.width*.36,s.height*.18,s.width*.28,s.height*.20),Radius.circular(s.width*.1)),Paint()..color=C.bg);
+              final skull=Path()..moveTo(s.width*.25,s.height*.42)..quadraticBezierTo(s.width*.5,s.height*.30,s.width*.75,s.height*.42)..quadraticBezierTo(s.width*.82,s.height*.62,s.width*.67,s.height*.73)..lineTo(s.width*.61,s.height*.85)..lineTo(s.width*.39,s.height*.85)..lineTo(s.width*.33,s.height*.73)..quadraticBezierTo(s.width*.18,s.height*.62,s.width*.25,s.height*.42)..close();
+              canvas.drawPath(skull,metal); canvas.drawPath(skull,glow);
+              final v=Paint()..color=C.bg;
+              canvas.drawOval(Rect.fromCenter(center:Offset(s.width*.38,s.height*.57),width:s.width*.17,height:s.height*.11),v);
+              canvas.drawOval(Rect.fromCenter(center:Offset(s.width*.62,s.height*.57),width:s.width*.17,height:s.height*.11),v);
+              final rune=Paint()..style=PaintingStyle.stroke..strokeWidth=s.width*.025..color=C.ember;
+              canvas.drawLine(Offset(s.width*.5,s.height*.40),Offset(s.width*.5,s.height*.57),rune);
+              canvas.drawLine(Offset(s.width*.5,s.height*.42),Offset(s.width*.43,s.height*.50),rune);
+              canvas.drawLine(Offset(s.width*.5,s.height*.42),Offset(s.width*.57,s.height*.50),rune);
+            }
+            @override bool shouldRepaint(covariant CustomPainter oldDelegate)=>false;
+          }
+
+          class ActionCard extends StatefulWidget {
+            const ActionCard({super.key, required this.title, required this.subtitle, required this.icon, required this.onTap, required this.height, this.main=false});
+            final String title, subtitle; final IconData icon; final VoidCallback onTap; final double height; final bool main;
+            @override State<ActionCard> createState()=>_ActionCardState();
+          }
+
+          class _ActionCardState extends State<ActionCard> {
+            bool down=false;
+            @override
+            Widget build(BuildContext context) => AnimatedScale(scale:down ? .985 : 1,duration:const Duration(milliseconds:90),child:GestureDetector(
+              onTapDown:(_)=>setState(()=>down=true),onTapCancel:()=>setState(()=>down=false),onTapUp:(_)=>setState(()=>down=false),onTap:(){HapticFeedback.selectionClick();widget.onTap();},
+              child:ClipPath(clipper:Cut(widget.main?16:12),child:CustomPaint(foregroundPainter:BorderP(widget.main?16:12,down),child:Container(
+                height:widget.height,
+                decoration:const BoxDecoration(gradient:LinearGradient(begin:Alignment.topLeft,end:Alignment.bottomRight,colors:[Color(0xFF292929),Color(0xFF111111),Color(0xFF060606)])),
+                child:Row(children:[
+                  Expanded(flex:40,child:Stack(alignment:Alignment.center,children:[
+                    if(widget.main)SizedBox(width:92,height:92,child:CustomPaint(painter:WarRing())),
+                    Icon(widget.icon,size:widget.main?76:56,color:C.steel,shadows:const[Shadow(color:Colors.black,blurRadius:6,offset:Offset(0,3)),Shadow(color:Color(0x77E43A26),blurRadius:5)]),
+                  ])),
+                  const SizedBox(width:8),
+                  Expanded(flex:60,child:Padding(padding:const EdgeInsets.only(right:10),child:Column(mainAxisAlignment:MainAxisAlignment.center,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+                    FittedBox(fit:BoxFit.scaleDown,alignment:Alignment.centerLeft,child:Text(widget.title,style:TextStyle(fontSize:widget.main?27:18,height:.98,fontWeight:FontWeight.w900,letterSpacing:1,color:C.steel,shadows:const[Shadow(color:Colors.black,blurRadius:3,offset:Offset(0,2)),Shadow(color:Color(0x55E43A26),blurRadius:3)]))),
+                    const SizedBox(height:8),
+                    Align(alignment:Alignment.centerLeft,child:Container(width:116,height:4,decoration:BoxDecoration(borderRadius:BorderRadius.circular(4),gradient:const LinearGradient(colors:[Color(0x00B82019),Color(0xFFDB3325),Color(0xFFA71812),Color(0x00B82019)]),boxShadow:const[BoxShadow(color:Color(0x55E43A26),blurRadius:5)]))),
+                    const SizedBox(height:7),
+                    Text(widget.subtitle.toUpperCase(),maxLines:2,overflow:TextOverflow.ellipsis,style:TextStyle(fontSize:widget.main?10.5:8.5,fontWeight:FontWeight.w900,fontStyle:FontStyle.italic,letterSpacing:.8,color:const Color(0xFFD0D0D0))),
+                  ]))),
+                ]),
+              ))),
+            ));
+          }
+
+          class WarRing extends CustomPainter {
+            @override void paint(Canvas c,Size s){final p=Paint()..style=PaintingStyle.stroke..strokeWidth=5..strokeCap=StrokeCap.round..color=C.red.withOpacity(.85);c.drawArc(Rect.fromLTWH(5,5,s.width-10,s.height-10),-.35,math.pi*1.72,false,p);} @override bool shouldRepaint(covariant CustomPainter o)=>false;
+          }
+          class Cut extends CustomClipper<Path>{Cut(this.n);final double n;@override Path getClip(Size s)=>Path()..moveTo(n,0)..lineTo(s.width-n,0)..lineTo(s.width,n)..lineTo(s.width,s.height-n)..lineTo(s.width-n,s.height)..lineTo(n,s.height)..lineTo(0,s.height-n)..lineTo(0,n)..close();@override bool shouldReclip(Cut o)=>o.n!=n;}
+          class BorderP extends CustomPainter{BorderP(this.n,this.down);final double n;final bool down;@override void paint(Canvas c,Size s){final p=Cut(n).getClip(s);c.drawPath(p,Paint()..style=PaintingStyle.stroke..strokeWidth=down?2:1.5..color=down?const Color(0xFF9D9D9D):const Color(0xFF666666));c.drawPath(p,Paint()..style=PaintingStyle.stroke..strokeWidth=.7..color=C.ember.withOpacity(down ? .55 : .28));}@override bool shouldRepaint(BorderP o)=>o.down!=down||o.n!=n;}
+
+          class PlaceholderPage extends StatelessWidget {
+            const PlaceholderPage({super.key,required this.title,required this.icon}); final String title; final IconData icon;
+            @override Widget build(BuildContext context)=>ForgeBg(child:SafeArea(child:Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
+              Icon(icon,size:92,color:C.steel,shadows:const[Shadow(color:C.ember,blurRadius:10)]),const SizedBox(height:20),Text(title,textAlign:TextAlign.center,style:const TextStyle(fontSize:32,fontWeight:FontWeight.w900,letterSpacing:1.5,color:C.steel)),const SizedBox(height:10),Container(width:210,height:4,color:C.ember),const SizedBox(height:12),const Text('SEZIONE IN SVILUPPO',style:TextStyle(fontWeight:FontWeight.w900,letterSpacing:2,color:C.steel,fontSize:11)),
+            ]))));
+          }
+          DART
+          sed -i 's/android:label="hefja"/android:label="HEFJA"/g' hefja/android/app/src/main/AndroidManifest.xml || true
+          cd hefja
+          flutter pub get
+          flutter build apk --release
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HEFJA-v1-APK
+          path: hefja/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
 
